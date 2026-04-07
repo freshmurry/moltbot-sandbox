@@ -99,35 +99,27 @@ else
 fi
 
 # ============================================================
-# ONBOARD (only if no config exists yet)
+# BOOTSTRAP CONFIG (direct write — no onboard hang risk)
 # ============================================================
+# Write a minimal valid config if none exists.
+# The node patch block below will fill in all provider/model/channel details.
 if [ ! -f "$CONFIG_FILE" ]; then
-    echo "No existing config found, running openclaw onboard..."
-
-    AUTH_ARGS=""
-    if [ -n "$CLOUDFLARE_AI_GATEWAY_API_KEY" ] && [ -n "$CF_AI_GATEWAY_ACCOUNT_ID" ] && [ -n "$CF_AI_GATEWAY_GATEWAY_ID" ]; then
-        AUTH_ARGS="--auth-choice cloudflare-ai-gateway-api-key \
-            --cloudflare-ai-gateway-account-id $CF_AI_GATEWAY_ACCOUNT_ID \
-            --cloudflare-ai-gateway-gateway-id $CF_AI_GATEWAY_GATEWAY_ID \
-            --cloudflare-ai-gateway-api-key $CLOUDFLARE_AI_GATEWAY_API_KEY"
-    elif [ -n "$ANTHROPIC_API_KEY" ]; then
-        AUTH_ARGS="--auth-choice apiKey --anthropic-api-key $ANTHROPIC_API_KEY"
-    elif [ -n "$OPENAI_API_KEY" ]; then
-        AUTH_ARGS="--auth-choice openai-api-key --openai-api-key $OPENAI_API_KEY"
-    fi
-
-    openclaw onboard --non-interactive --accept-risk \
-        --mode local \
-        $AUTH_ARGS \
-        --gateway-port 18789 \
-        --gateway-bind lan \
-        --skip-channels \
-        --skip-skills \
-        --skip-health
-
-    echo "Onboard completed"
+    echo "No existing config found, writing bootstrap config..."
+    cat > "$CONFIG_FILE" << 'BOOTSTRAP'
+{
+  "gateway": {
+    "port": 18789,
+    "mode": "local",
+    "bind": "lan"
+  },
+  "models": {},
+  "agents": {},
+  "channels": {}
+}
+BOOTSTRAP
+    echo "Bootstrap config written"
 else
-    echo "Using existing config"
+    echo "Using existing config (will be patched below)"
 fi
 
 # ============================================================
