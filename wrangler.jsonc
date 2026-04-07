@@ -38,7 +38,7 @@
   "vars": {
     "CF_AI_GATEWAY_ACCOUNT_ID": "927bd55a77a1bc0a9c344ec45a6eed7e",
     "CF_AI_GATEWAY_GATEWAY_ID": "moltworker",
-    "CF_AI_GATEWAY_MODEL": "workers-ai/@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+    "CF_AI_GATEWAY_MODEL": "workers-ai/@cf/meta/llama-3.1-8b-instruct",
   },
   // Container configuration for the Moltbot sandbox
   "containers": [
