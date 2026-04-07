@@ -198,7 +198,9 @@ if (process.env.CF_AI_GATEWAY_MODEL) {
         baseUrl = 'https://api.cloudflare.com/client/v4/accounts/' + process.env.CF_ACCOUNT_ID + '/ai/v1';
     }
 
-    if (baseUrl && apiKey) {
+    // Workers AI via AI Gateway uses the Worker's own CF auth — apiKey not required
+    const needsApiKey = gwProvider !== 'workers-ai';
+    if (baseUrl && (apiKey || !needsApiKey)) {
         const api = gwProvider === 'anthropic' ? 'anthropic-messages' : 'openai-completions';
         const providerName = 'cf-ai-gw-' + gwProvider;
 
@@ -206,7 +208,7 @@ if (process.env.CF_AI_GATEWAY_MODEL) {
         config.models.providers = config.models.providers || {};
         config.models.providers[providerName] = {
             baseUrl: baseUrl,
-            apiKey: apiKey,
+            apiKey: apiKey || '',
             api: api,
             models: [{ id: modelId, name: modelId, contextWindow: 131072, maxTokens: 8192 }],
         };
