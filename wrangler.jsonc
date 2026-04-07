@@ -32,6 +32,14 @@
   "build": {
     "command": "npm run build",
   },
+  // Non-sensitive environment variables
+  // Primary AI: Cloudflare Workers AI (native, free tier)
+  // Anthropic remains available as fallback via ANTHROPIC_API_KEY secret
+  "vars": {
+    "CF_AI_GATEWAY_ACCOUNT_ID": "927bd55a77a1bc0a9c344ec45a6eed7e",
+    "CF_AI_GATEWAY_GATEWAY_ID": "moltworker",
+    "CF_AI_GATEWAY_MODEL": "workers-ai/@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+  },
   // Container configuration for the Moltbot sandbox
   "containers": [
     {
@@ -71,15 +79,9 @@
   // Secrets to configure via `wrangler secret put`:
   //
   // AI Provider (at least one set required):
-  // - ANTHROPIC_API_KEY: Direct Anthropic API key
-  // - OPENAI_API_KEY: Direct OpenAI API key
-  // - Cloudflare AI Gateway (alternative to direct keys):
+  // - ANTHROPIC_API_KEY: Direct Anthropic API key (fallback)
+  // - Cloudflare AI Gateway (primary - configured in vars above):
   //   - CLOUDFLARE_AI_GATEWAY_API_KEY: API key for requests through the gateway
-  //   - CF_AI_GATEWAY_ACCOUNT_ID: Your Cloudflare account ID
-  //   - CF_AI_GATEWAY_GATEWAY_ID: Your AI Gateway ID
-  // - Legacy AI Gateway (still supported):
-  //   - AI_GATEWAY_API_KEY: API key
-  //   - AI_GATEWAY_BASE_URL: Gateway endpoint URL
   //
   // Authentication:
   // - MOLTBOT_GATEWAY_TOKEN: Token to protect gateway access
