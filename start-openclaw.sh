@@ -215,6 +215,8 @@ if (process.env.CF_AI_GATEWAY_MODEL) {
         config.agents = config.agents || {};
         config.agents.defaults = config.agents.defaults || {};
         config.agents.defaults.model = { primary: providerName + '/' + modelId };
+        config.agents.defaults.systemPrompt = 'You are a helpful AI assistant. Always respond to every message, no matter how short or casual. Never output raw JSON or tool call syntax — always respond in plain, natural language. If someone says hello, greet them back.';
+        config.agents.defaults.noReply = false;
         console.log('AI Gateway model override: provider=' + providerName + ' model=' + modelId + ' via ' + baseUrl);
     } else {
         console.warn('CF_AI_GATEWAY_MODEL set but missing required config (account ID, gateway ID, or API key)');
