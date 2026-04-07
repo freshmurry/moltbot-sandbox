@@ -30,9 +30,9 @@ export async function findExistingMoltbotProcess(sandbox: Sandbox): Promise<Proc
         proc.command.includes('clawdbot --version');
 
       if (isGatewayProcess && !isCliCommand) {
-        if (proc.status === 'starting' || proc.status === 'running') {
-          return proc;
-        }
+        // Return process regardless of status — even 'starting' or unknown states
+        // The caller handles waiting via waitForPort with the full STARTUP_TIMEOUT_MS
+        return proc;
       }
     }
   } catch (e) {
