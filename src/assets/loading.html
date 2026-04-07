@@ -181,15 +181,22 @@
 
           // Update status message based on state
           if (data.status === 'not_running') {
-            statusEl.textContent = 'Container is starting up...';
+            statusEl.textContent = 'Starting container... this can take 60-90 seconds on first boot.';
           } else if (data.status === 'not_responding') {
-            statusEl.textContent = 'Container started, waiting for gateway...';
+            statusEl.textContent = 'Container running, gateway initializing... (' + pollCount + ')';
+          } else if (data.status === 'running') {
+            // Should have been caught above but handle here too
+            titleEl.innerHTML = '<span class="ready">Moltworker is ready!</span>';
+            statusEl.textContent = 'Redirecting...';
+            setTimeout(() => window.location.reload(), 500);
+            return;
           } else {
-            statusEl.textContent = 'Checking status... (poll #' + pollCount + ')';
+            statusEl.textContent = 'Starting up... poll #' + pollCount + ' (' + (data.status || 'unknown') + ')';
           }
 
-          // Continue polling
-          setTimeout(checkStatus, 2000);
+          // Continue polling — use longer interval when container is still cold-starting
+          const interval = pollCount < 10 ? 3000 : 2000;
+          setTimeout(checkStatus, interval);
         } catch (err) {
           consecutiveErrors++;
 
