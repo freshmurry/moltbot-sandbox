@@ -260,6 +260,25 @@ if (process.env.SLACK_BOT_TOKEN && process.env.SLACK_APP_TOKEN) {
     };
 }
 
+// Fallback: if no provider configured yet but ANTHROPIC_API_KEY exists, use it natively
+if (process.env.ANTHROPIC_API_KEY && (!config.models || !config.models.providers || Object.keys(config.models.providers || {}).length === 0)) {
+    console.log('No provider configured — setting up Anthropic natively from ANTHROPIC_API_KEY');
+    config.models = config.models || {};
+    config.models.providers = config.models.providers || {};
+    config.models.providers['anthropic'] = {
+        apiKey: process.env.ANTHROPIC_API_KEY,
+        api: 'anthropic-messages',
+        models: [
+            { id: 'claude-3-5-haiku-20241022', name: 'Claude 3.5 Haiku', contextWindow: 200000, maxTokens: 8192 },
+            { id: 'claude-3-5-sonnet-20241022', name: 'Claude 3.5 Sonnet', contextWindow: 200000, maxTokens: 8192 },
+        ],
+    };
+    config.agents = config.agents || {};
+    config.agents.defaults = config.agents.defaults || {};
+    config.agents.defaults.model = config.agents.defaults.model || { primary: 'anthropic/claude-3-5-haiku-20241022' };
+    config.agents.defaults.noReply = false;
+}
+
 fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
 console.log('Configuration patched successfully');
 EOFPATCH
