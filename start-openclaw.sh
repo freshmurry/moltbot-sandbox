@@ -119,7 +119,23 @@ if [ ! -f "$CONFIG_FILE" ]; then
 BOOTSTRAP
     echo "Bootstrap config written"
 else
-    echo "Using existing config (will be patched below)"
+    echo "Existing config found — stripping stale models/agents so patch can rebuild them cleanly..."
+    # Use node to remove models/agents from restored R2 config.
+    # This prevents stale or broken provider configs from crashing the gateway.
+    node -e "
+        const fs = require('fs');
+        const f = '$CONFIG_FILE';
+        try {
+            const c = JSON.parse(fs.readFileSync(f, 'utf8'));
+            delete c.models;
+            delete c.agents;
+            fs.writeFileSync(f, JSON.stringify(c, null, 2));
+            console.log('Stripped stale models/agents from config');
+        } catch(e) {
+            console.log('Could not strip config (will use fresh bootstrap):', e.message);
+            fs.writeFileSync(f, JSON.stringify({gateway:{port:18789,mode:'local',bind:'lan'},models:{},agents:{},channels:{}}, null, 2));
+        }
+    "
 fi
 
 # ============================================================
