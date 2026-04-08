@@ -38,7 +38,8 @@
   "vars": {
     "CF_AI_GATEWAY_ACCOUNT_ID": "927bd55a77a1bc0a9c344ec45a6eed7e",
     "CF_AI_GATEWAY_GATEWAY_ID": "moltworker",
-    "CF_AI_GATEWAY_MODEL": "workers-ai/@hf/nousresearch/hermes-2-pro-mistral-7b",
+    // CF_AI_GATEWAY_MODEL removed — workers-ai is not compatible with OpenClaw's provider system.
+    // Using ANTHROPIC_API_KEY (secret) directly instead.
   },
   // Container configuration for the Moltbot sandbox
   "containers": [
