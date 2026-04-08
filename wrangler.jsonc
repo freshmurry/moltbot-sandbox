@@ -38,8 +38,10 @@
   "vars": {
     "CF_AI_GATEWAY_ACCOUNT_ID": "927bd55a77a1bc0a9c344ec45a6eed7e",
     "CF_AI_GATEWAY_GATEWAY_ID": "moltworker",
-    // CF_AI_GATEWAY_MODEL removed — workers-ai is not compatible with OpenClaw's provider system.
-    // Using ANTHROPIC_API_KEY (secret) directly instead.
+    // DEV_MODE bypasses CF Access auth requirement (CF_ACCESS_TEAM_DOMAIN / CF_ACCESS_AUD not needed)
+    // and enables allowInsecureAuth so device pairing is skipped in the gateway control UI.
+    // Remove this if you set up Cloudflare Access on the worker.
+    "DEV_MODE": "true",
   },
   // Container configuration for the Moltbot sandbox
   "containers": [
