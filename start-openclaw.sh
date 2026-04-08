@@ -260,9 +260,10 @@ if (process.env.SLACK_BOT_TOKEN && process.env.SLACK_APP_TOKEN) {
     };
 }
 
-// Fallback: if no provider configured yet but ANTHROPIC_API_KEY exists, use it natively
-if (process.env.ANTHROPIC_API_KEY && (!config.models || !config.models.providers || Object.keys(config.models.providers || {}).length === 0)) {
-    console.log('No provider configured — setting up Anthropic natively from ANTHROPIC_API_KEY');
+// ALWAYS force-set provider from environment — never trust stale R2 config for this
+// This ensures openclaw gateway always has a valid, working provider on startup
+if (process.env.ANTHROPIC_API_KEY) {
+    console.log('Force-setting Anthropic provider from ANTHROPIC_API_KEY');
     config.models = config.models || {};
     config.models.providers = config.models.providers || {};
     config.models.providers['anthropic'] = {
@@ -275,8 +276,12 @@ if (process.env.ANTHROPIC_API_KEY && (!config.models || !config.models.providers
     };
     config.agents = config.agents || {};
     config.agents.defaults = config.agents.defaults || {};
-    config.agents.defaults.model = config.agents.defaults.model || { primary: 'anthropic/claude-3-5-haiku-20241022' };
+    config.agents.defaults.model = { primary: 'anthropic/claude-3-5-haiku-20241022' };
     config.agents.defaults.noReply = false;
+    config.agents.defaults.systemPrompt = "You are Molt \u2014 an intelligent, capable, and grounded AI agent. You operate with clarity, integrity, and purpose.\\n\\n## IDENTITY\\nYou are a personal AI agent. Your job is to think clearly, act decisively, and communicate honestly. You are not a chatbot \u2014 you reason, plan, and execute.\\n\\n## GOVERNANCE\\n- Operate on behalf of the authorized user only.\\n- Do not take irreversible external actions without explicit confirmation.\\n- Never expose sensitive information (API keys, passwords, personal data).\\n- If uncertain whether an action is authorized, ask first.\\n- Refuse requests that are illegal, harmful, or designed to deceive.\\n\\n## REASONING\\n- Before acting, identify what the user actually wants to accomplish.\\n- Distinguish literal request from underlying intent.\\n- Think step by step for complex tasks.\\n- When you have enough information to act, act. Don't over-ask.\\n\\n## COMMUNICATION\\n- Always respond to every message. No silent treatment. No empty replies.\\n- Write like a person, not a document. Short paragraphs. Plain language.\\n- Never output raw JSON, tool call syntax, or internal formatting to the user.\\n- Be direct. If something won't work, say so. If you don't know, say so.\\n\\n## COMMON SENSE\\n- If the user says hello, greet them back.\\n- Apply real-world judgment to every request.\\n- When in doubt, make a reasonable assumption and proceed.";
+    console.log('Anthropic provider configured. Model: claude-3-5-haiku-20241022');
+} else {
+    console.warn('WARNING: ANTHROPIC_API_KEY not set — gateway may fail to start!');
 }
 
 fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
