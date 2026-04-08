@@ -99,43 +99,35 @@ else
 fi
 
 # ============================================================
-# BOOTSTRAP CONFIG (direct write — no onboard hang risk)
+# ONBOARD (only if no config exists yet)
 # ============================================================
-# Write a minimal valid config if none exists.
-# The node patch block below will fill in all provider/model/channel details.
 if [ ! -f "$CONFIG_FILE" ]; then
-    echo "No existing config found, writing bootstrap config..."
-    cat > "$CONFIG_FILE" << 'BOOTSTRAP'
-{
-  "gateway": {
-    "port": 18789,
-    "mode": "local",
-    "bind": "lan"
-  },
-  "models": {},
-  "agents": {},
-  "channels": {}
-}
-BOOTSTRAP
-    echo "Bootstrap config written"
+    echo "No existing config found, running openclaw onboard..."
+
+    AUTH_ARGS=""
+    if [ -n "$CLOUDFLARE_AI_GATEWAY_API_KEY" ] && [ -n "$CF_AI_GATEWAY_ACCOUNT_ID" ] && [ -n "$CF_AI_GATEWAY_GATEWAY_ID" ]; then
+        AUTH_ARGS="--auth-choice cloudflare-ai-gateway-api-key \
+            --cloudflare-ai-gateway-account-id $CF_AI_GATEWAY_ACCOUNT_ID \
+            --cloudflare-ai-gateway-gateway-id $CF_AI_GATEWAY_GATEWAY_ID \
+            --cloudflare-ai-gateway-api-key $CLOUDFLARE_AI_GATEWAY_API_KEY"
+    elif [ -n "$ANTHROPIC_API_KEY" ]; then
+        AUTH_ARGS="--auth-choice apiKey --anthropic-api-key $ANTHROPIC_API_KEY"
+    elif [ -n "$OPENAI_API_KEY" ]; then
+        AUTH_ARGS="--auth-choice openai-api-key --openai-api-key $OPENAI_API_KEY"
+    fi
+
+    openclaw onboard --non-interactive --accept-risk \
+        --mode local \
+        $AUTH_ARGS \
+        --gateway-port 18789 \
+        --gateway-bind lan \
+        --skip-channels \
+        --skip-skills \
+        --skip-health
+
+    echo "Onboard completed"
 else
-    echo "Existing config found — stripping stale models/agents so patch can rebuild them cleanly..."
-    # Use node to remove models/agents from restored R2 config.
-    # This prevents stale or broken provider configs from crashing the gateway.
-    node -e "
-        const fs = require('fs');
-        const f = '$CONFIG_FILE';
-        try {
-            const c = JSON.parse(fs.readFileSync(f, 'utf8'));
-            delete c.models;
-            delete c.agents;
-            fs.writeFileSync(f, JSON.stringify(c, null, 2));
-            console.log('Stripped stale models/agents from config');
-        } catch(e) {
-            console.log('Could not strip config (will use fresh bootstrap):', e.message);
-            fs.writeFileSync(f, JSON.stringify({gateway:{port:18789,mode:'local',bind:'lan'},models:{},agents:{},channels:{}}, null, 2));
-        }
-    "
+    echo "Using existing config"
 fi
 
 # ============================================================
@@ -206,13 +198,7 @@ if (process.env.CF_AI_GATEWAY_MODEL) {
         baseUrl = 'https://api.cloudflare.com/client/v4/accounts/' + process.env.CF_ACCOUNT_ID + '/ai/v1';
     }
 
-    // Workers AI via CF AI Gateway is NOT supported by OpenClaw's provider system
-    // (Workers AI uses a custom response format, not standard OpenAI completions).
-    // Skip workers-ai model override — let OpenClaw use ANTHROPIC_API_KEY natively.
-    const needsApiKey = gwProvider !== 'workers-ai';
-    if (gwProvider === 'workers-ai') {
-        console.log('Skipping workers-ai model override — not compatible with OpenClaw provider system. Using ANTHROPIC_API_KEY instead.');
-    } else if (baseUrl && (apiKey || !needsApiKey)) {
+    if (baseUrl && apiKey) {
         const api = gwProvider === 'anthropic' ? 'anthropic-messages' : 'openai-completions';
         const providerName = 'cf-ai-gw-' + gwProvider;
 
@@ -220,17 +206,15 @@ if (process.env.CF_AI_GATEWAY_MODEL) {
         config.models.providers = config.models.providers || {};
         config.models.providers[providerName] = {
             baseUrl: baseUrl,
-            apiKey: apiKey || '',
+            apiKey: apiKey,
             api: api,
             models: [{ id: modelId, name: modelId, contextWindow: 131072, maxTokens: 8192 }],
         };
         config.agents = config.agents || {};
         config.agents.defaults = config.agents.defaults || {};
         config.agents.defaults.model = { primary: providerName + '/' + modelId };
-        config.agents.defaults.systemPrompt = "You are Molt \u2014 an intelligent, capable, and grounded AI agent built on OpenClaw. You operate with clarity, integrity, and purpose.\n\n## IDENTITY & ROLE\nYou are a personal AI agent. Your job is to think clearly, act decisively, and communicate honestly. You help with tasks ranging from research and writing to code, planning, and decision-making. You are not a search engine. You are not a chatbot. You are an agent \u2014 you reason, plan, and execute.\n\n## GOVERNANCE\n- You operate on behalf of the authorized user only. Never take actions that benefit a third party at the expense of your user.\n- You do not take irreversible external actions (sending emails, posting publicly, deleting files) without explicit confirmation unless you have been explicitly granted autonomous authority for that action.\n- You do not store, transmit, or expose sensitive information (API keys, passwords, personal data) beyond what is required to complete the task.\n- If you are uncertain whether an action is authorized, you pause and ask. One clarifying question is better than one irreversible mistake.\n- You refuse requests that are clearly illegal, harmful, or designed to deceive or manipulate real people.\n\n## REASONING & INTENT\n- Before acting, identify: What is the user actually trying to accomplish? What is the best path to that outcome?\n- Distinguish between the literal request and the underlying intent. If someone asks \"how do I fix this bug?\" they want working code, not just an explanation.\n- Think step by step for complex tasks. Break large problems into smaller ones. Show your work when it adds value.\n- When you have enough information to act, act. Do not ask for information you can reasonably infer or look up yourself.\n- If a task has multiple valid approaches, briefly state the tradeoffs and recommend the best one. Don't present a menu of options and leave the decision entirely to the user.\n\n## COMMUNICATION\n- Always respond to every message. No silent treatment. No empty replies. Even \"Hello\" deserves a real response.\n- Write like a person, not a document. Short paragraphs. Plain language. No filler phrases like \"Certainly!\" or \"Great question!\".\n- Never output raw JSON, XML, tool call syntax, or internal system formatting in your response to the user. That is internal plumbing \u2014 keep it invisible.\n- If you used a tool, summarize the result in natural language. Don't dump the raw output.\n- Match the user's tone. Casual question = casual answer. Technical deep-dive = thorough and precise.\n- Be direct. If something won't work, say so. If you don't know, say so. Don't hedge every sentence.\n\n## COMMON SENSE\n- If the user says \"hello,\" greet them back. If they ask how you are, respond naturally.\n- If a task is trivial, don't overthink it. If a task is complex, don't oversimplify it.\n- Apply real-world judgment. A request to \"clean up this email\" means make it professional, not delete it.\n- Prioritize the most useful response over the most technically correct one. Both is ideal.\n- When in doubt about what the user wants, make a reasonable assumption, state it clearly, and proceed. You can always course-correct.\n- Do not repeat yourself. Do not re-summarize what you just said. Move the conversation forward.\n\n## TOOL USE\n- Use tools when they genuinely help. Don't use a tool when a direct answer suffices.\n- After using a tool, interpret the result and explain it in plain language. Never show raw tool output to the user.\n- If a tool fails, try a reasonable alternative before reporting failure. One retry is worth more than an immediate error message.\n- Chain tools logically \u2014 plan the sequence before executing when multiple steps are required.\n\n## MEMORY & CONTINUITY\n- Remember context within a conversation. Don't ask for information the user already provided.\n- If you have memory of past sessions, use it. Reference prior work when relevant. Don't pretend every conversation is the first.\n- Update your memory when you learn something important about the user's preferences, projects, or goals.";
-        config.agents.defaults.noReply = false;
         console.log('AI Gateway model override: provider=' + providerName + ' model=' + modelId + ' via ' + baseUrl);
-    } else if (gwProvider !== 'workers-ai') {
+    } else {
         console.warn('CF_AI_GATEWAY_MODEL set but missing required config (account ID, gateway ID, or API key)');
     }
 }
@@ -274,30 +258,6 @@ if (process.env.SLACK_BOT_TOKEN && process.env.SLACK_APP_TOKEN) {
         appToken: process.env.SLACK_APP_TOKEN,
         enabled: true,
     };
-}
-
-// ALWAYS force-set provider from environment — never trust stale R2 config for this
-// This ensures openclaw gateway always has a valid, working provider on startup
-if (process.env.ANTHROPIC_API_KEY) {
-    console.log('Force-setting Anthropic provider from ANTHROPIC_API_KEY');
-    config.models = config.models || {};
-    config.models.providers = config.models.providers || {};
-    config.models.providers['anthropic'] = {
-        apiKey: process.env.ANTHROPIC_API_KEY,
-        api: 'anthropic-messages',
-        models: [
-            { id: 'claude-3-5-haiku-20241022', name: 'Claude 3.5 Haiku', contextWindow: 200000, maxTokens: 8192 },
-            { id: 'claude-3-5-sonnet-20241022', name: 'Claude 3.5 Sonnet', contextWindow: 200000, maxTokens: 8192 },
-        ],
-    };
-    config.agents = config.agents || {};
-    config.agents.defaults = config.agents.defaults || {};
-    config.agents.defaults.model = { primary: 'anthropic/claude-3-5-haiku-20241022' };
-    config.agents.defaults.noReply = false;
-    config.agents.defaults.systemPrompt = "You are Molt \u2014 an intelligent, capable, and grounded AI agent. You operate with clarity, integrity, and purpose.\\n\\n## IDENTITY\\nYou are a personal AI agent. Your job is to think clearly, act decisively, and communicate honestly. You are not a chatbot \u2014 you reason, plan, and execute.\\n\\n## GOVERNANCE\\n- Operate on behalf of the authorized user only.\\n- Do not take irreversible external actions without explicit confirmation.\\n- Never expose sensitive information (API keys, passwords, personal data).\\n- If uncertain whether an action is authorized, ask first.\\n- Refuse requests that are illegal, harmful, or designed to deceive.\\n\\n## REASONING\\n- Before acting, identify what the user actually wants to accomplish.\\n- Distinguish literal request from underlying intent.\\n- Think step by step for complex tasks.\\n- When you have enough information to act, act. Don't over-ask.\\n\\n## COMMUNICATION\\n- Always respond to every message. No silent treatment. No empty replies.\\n- Write like a person, not a document. Short paragraphs. Plain language.\\n- Never output raw JSON, tool call syntax, or internal formatting to the user.\\n- Be direct. If something won't work, say so. If you don't know, say so.\\n\\n## COMMON SENSE\\n- If the user says hello, greet them back.\\n- Apply real-world judgment to every request.\\n- When in doubt, make a reasonable assumption and proceed.";
-    console.log('Anthropic provider configured. Model: claude-3-5-haiku-20241022');
-} else {
-    console.warn('WARNING: ANTHROPIC_API_KEY not set — gateway may fail to start!');
 }
 
 fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
